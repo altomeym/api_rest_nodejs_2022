@@ -1,6 +1,11 @@
 # API REST Nodejs desde cero usando MongoDB o MySQL
-+ [URL del curso en Udemy](https://www.udemy.com/course/api-rest-nodejs-desde-cero-usando-mongodb-o-mysql)
-+ [URL del repositorio en GitHub](https://github.com/petrix12/api_rest_nodejs_2022.git)
++ [Curso en Udemy](https://www.udemy.com/course/api-rest-nodejs-desde-cero-usando-mongodb-o-mysql)
++ [Mi repositorio en GitHub](https://github.com/petrix12/api_rest_nodejs_2022.git)
++ [Repositorio del autor](https://github.com/leifermendez/curso-node-api-js)
++ [Node.js](https://nodejs.org)
++ [Visual Studio Code](https://code.visualstudio.com)
++ [Git](https://git-scm.com/downloads)
++ [Atlas MongoDB](https://www.mongodb.com/atlas/database)
 
 
 ## Antes de iniciar:
@@ -18,15 +23,49 @@
 
 ## Sección 1: Introducción
 ### 1. Introducción
-1 min
++ **Repositorio**: https://github.com/leifermendez/curso-node-api-js
++ **Contenido**: presentación del curso.
+
 ### 2. Expectativas del curso
-3 min
++ **Contenido**: sobre Node.js y expectativas del curso.
+
 ### 3. Entorno de Trabajo (Preparación)
-7 min
+1. Requerimientos:
+    + [Node.js](https://nodejs.org)
+    + [Visual Studio Code](https://code.visualstudio.com)
+    + [Git](https://git-scm.com/downloads)
+
 ### 4. Entorno MongoDB
-8 min
++ https://www.mongodb.com/atlas/database
+1. Crear una cuenta en MongoDB Atlas para luego crear un servicio de base de datos MongoDB.
+2. Obtener la cádena de conexión:
+    + Click en **Database**.
+    + Click en **Connect**.
+    + Click en **Connect your application**.
+    + Copiar cádena de conexión:
+        + mongodb+srv://petrix:<password>@cluster0.hrqzg.mongodb.net/myFirstDatabase?retryWrites=true&w=majority
+        + Donde se deberá reemplazar:
+            + <password>: password
+            + myFirstDatabase: nombre de la base de datos
+
+## Sección 2: Iniciando Proyecto
 ### 5. Iniciando
-15 min
+1. Ejecutar:
+    + $ npm init --y
+2. mmmm
+
+
+
+
+
+
+
+    ```php
+    ≡
+    ≡
+    ```
+
+
 ### 6. Scaffold (Estructura de proyecto)
 10 min
 ### 7. Modelos (MongoDB)
@@ -43,6 +82,9 @@
 18 min
 ### 13. Middleware
 9 min
+
+
+## Sección 3: CRUD (Create - Read - Update - Delete)
 ### 14. Capturar errores
 14 min
 ### 15. CRUD
@@ -112,16 +154,4 @@
 ### 47. Compilando aplicación TypeScript
 4 min
 
-
-
-
-
-
-
-
-
-    ```php
-    ≡
-    ≡
-    ```
 
