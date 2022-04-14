@@ -567,7 +567,8 @@
             .notEmpty(),
         check("mediaId")
             .exists()
-            .notEmpty(),
+            .notEmpty()
+            .isMongoId(),
         (req, res, next) => {
             return validateResults(req, res, next)
         }
@@ -691,8 +692,388 @@
 
 ## Sección 3: CRUD (Create - Read - Update - Delete)
 ### 14. Capturar errores
-14 min
++ https://www.webfx.com/web-development/glossary/http-status-codes
+1. Crear handle **node\utils\handleError.js**:
+    ```js
+    const handleHttpError = (res, message = "Algo sucedio", code = 403) => {
+        res.status(code)
+        res.send({ error: message })
+    }
 
+    module.exports = { handleHttpError }
+    ```
+2. Modificar controlador **node\controllers\tracks.js**:
+    ```js
+    ≡
+    const { handleHttpError } = require('../utils/handleError')
+
+    ≡
+    const getItems = async (req, res) => {
+        try {
+            const data = await tracksModel.find({})
+            res.send({data})
+        } catch(e) {
+            handleHttpError(res, 'ERROR_GET_ITEMS')
+        }
+    }
+    ≡
+    const createItem = async (req, res) => {
+        try {
+            const body = matchedData(req)
+            const data = await tracksModel.create(body)
+            res.send({ data })
+        } catch(e) {
+            handleHttpError(res, 'ERROR_CREATE_ITEMS')
+        }
+    }
+    ≡
+    ```
+3. Modificar archivo de rutas **node\routes\tracks.js**:
+    ```js
+    const express = require('express')
+    const router = express.Router()
+    const { validatorCreateItem } = require('../validators/tracks')
+    const { getItems, getItem, createItem } = require('../controllers/tracks')
+
+    router.get('/', getItems)
+    router.post('/', validatorCreateItem, createItem)
+
+    module.exports = router
+    ```
+4. Realizar petición http:
+    + URL: http://localhost:3001/api/tracks
+    + Método: POST
+    + Body:
+        ```json
+        {
+            "otro": "valor",
+            "dato": "basura",
+            "name":"Prueba 4",
+            "album":"Eminem",
+            "cover":"https://cdns-images.dzcdn.net/images/cover/ec3c8ed67427064c70f67e5815b74cef/350x350.jpg",
+            "artist":{
+                "name":"Eminem",
+                "nickname":"Eminem",
+                "nationality":"US"
+            },
+            "duration":{
+                "start":1,
+                "end":0
+            },
+            "mediaId":"62271512ee5081a7027eeeea"
+        }
+        ```
+
+### 15. CRUD
+1. Modificar controlador **node\controllers\tracks.js**:
+    ```js
+    const { matchedData } = require('express-validator')
+    const { tracksModel } = require('../models')
+    const { handleHttpError } = require('../utils/handleError')
+
+    /**
+    * Obtener lista de la base de datos
+    * @param {*} req 
+    * @param {*} res 
+    */
+    const getItems = async (req, res) => {
+        try {
+            const data = await tracksModel.find({})
+            res.send({data})
+        } catch(e) {
+            handleHttpError(res, 'ERROR_GET_ITEMS')
+        }
+    }
+
+    /**
+    * Obtener un registro o documento de la lista
+    * @param {*} req 
+    * @param {*} res 
+    */
+    const getItem = async (req, res) => {
+        try {
+            req = matchedData(req)
+            const { id } = req
+            const data = await tracksModel.findById(id)
+            res.send({ data })
+        } catch(e) {
+            handleHttpError(res, 'ERROR_GET_ITEM')
+        }
+    }
+
+    /**
+    * Insertar un registro o documento a la lista
+    * @param {*} req 
+    * @param {*} res 
+    */
+    const createItem = async (req, res) => {
+        try {
+            const body = matchedData(req)
+            const data = await tracksModel.create(body)
+            res.send({ data })
+        } catch(e) {
+            handleHttpError(res, 'ERROR_CREATE_ITEMS')
+        }
+    }
+
+    /**
+    * Actualizar un registro o documento de la lista
+    * @param {*} req 
+    * @param {*} res 
+    */
+    const updateItem = async (req, res) => {
+        try {
+            const {id, ...body} = matchedData(req)
+            const data = await tracksModel.findOneAndUpdate(id, body)
+            res.send({ data })
+        } catch(e) {
+            handleHttpError(res, 'ERROR_UPDATE_ITEMS')
+        }
+    }
+
+    /**
+    * Eliminar un registro o documento de la lista
+    * @param {*} req 
+    * @param {*} res 
+    */
+    const deleteItem = async (req, res) => {
+        try {
+            req = matchedData(req)
+            const { id } = req
+            const data = await tracksModel.deleteOne({_id:id})
+            res.send({ data })
+        } catch(e) {
+            handleHttpError(res, 'ERROR_DELETE_ITEM')
+        }
+    }
+
+    module.exports = { getItems, getItem, createItem, updateItem, deleteItem }
+    ```
+2. Modificar archivo de rutas **node\routes\tracks.js**:
+    ```js
+    const express = require('express')
+    const router = express.Router()
+    const { validatorCreateItem, validatorGetItem } = require('../validators/tracks')
+    const { getItems, getItem, createItem, updateItem, deleteItem } = require('../controllers/tracks')
+
+    router.get('/', getItems)
+    router.get('/:id', validatorGetItem, getItem)
+    router.post('/', validatorCreateItem, createItem)
+    router.put('/:id', validatorGetItem, validatorCreateItem, updateItem)
+    router.delete('/:id', validatorGetItem, deleteItem)
+
+    module.exports = router
+    ```
+3. Modificar validator **node\validators\tracks.js**:
+    ```js
+    ≡
+    const validatorGetItem = [
+        check("id")
+            .exists()
+            .notEmpty()
+            .isMongoId(),
+        (req, res, next) => {
+            return validateResults(req, res, next)
+        }
+    ];
+
+    module.exports = { validatorCreateItem, validatorGetItem }
+    ```
+4. Realizar petición http:
+    + URL: http://localhost:3001/api/tracks
+    + Método: GET
+5. Realizar petición http:
+    + URL: http://localhost:3001/api/tracks/62575746f7af8bb840b8a7f2
+    + Método: GET
+6. Realizar petición http:
+    + URL: http://localhost:3001/api/tracks/62575746f7af8bb840b8a7f2
+    + Método: PUT
+    + Body:
+        ```json
+        {
+            "otro": "valor",
+            "dato": "basura",
+            "name":"Prueba 2 Actualizado",
+            "album":"Eminem",
+            "cover":"https://cdns-images.dzcdn.net/images/cover/ec3c8ed67427064c70f67e5815b74cef/350x350.jpg",
+            "artist":{
+                "name":"Eminem",
+                "nickname":"Eminem",
+                "nationality":"US"
+            },
+            "duration":{
+                "start":1,
+                "end":0
+            },
+            "mediaId":"62271512ee5081a7027eeeea"
+        }
+        ```
+7. Realizar petición http:
+    + URL: http://localhost:3001/api/tracks/62575746f7af8bb840b8a7f2
+    + Método: DELETE
+
+### 16. Soft Delete (Eliminado Lógico)
++ https://www.npmjs.com/package/mongoose-delete
+1. Ejecutar:
+    + $ npm i mongoose-delete -S
+2. Modificar modelo **node\models\nosql\tracks.js**:
+    ```js
+    const mongoose = require('mongoose')
+    const mongooseDelete = require('mongoose-delete')
+    ≡
+    TracksSchema.plugin(mongooseDelete, { overrideMethods: 'all'})
+    module.exports = mongoose.model('tracks', TracksSchema)
+    ```
+3. Modificar modelo **node\models\nosql\storage.js**:
+    ```js
+    const mongoose = require('mongoose')
+    const mongooseDelete = require('mongoose-delete')
+    ≡
+    StorageSchema.plugin(mongooseDelete, { overrideMethods: 'all'})
+    module.exports = mongoose.model('tracks', TracksSchema)
+    ```
+4. Modificar modelo **node\models\nosql\users.js**:
+    ```js
+    const mongoose = require('mongoose')
+    const mongooseDelete = require('mongoose-delete')
+    ≡
+    UserScheme.plugin(mongooseDelete, { overrideMethods: 'all'})
+    module.exports = mongoose.model('tracks', TracksSchema)
+    ```
+
+### 17. Controlador de Archivos
+1. Modificar controlador **node\controllers\storage.js**:
+    ```js
+    const fs = require('fs')
+    const { matchedData } = require('express-validator')
+    const { storageModel } = require('../models')
+    const { handleHttpError } = require('../utils/handleError')
+
+    const PUBLIC_URL = process.env.PUBLIC_URL
+    const MEDIA_PATH = `${__dirname}/../storage`
+
+    /**
+    * Obtener lista de la base de datos
+    * @param {*} req 
+    * @param {*} res 
+    */
+    const getItems = async (req, res) => {
+        try {
+            const { id } = matchedData(req)
+            const data = await storageModel.find(id)
+            res.send({data})
+        } catch (e) {
+            handleHttpError(res, 'ERROR_GET_ITEMS')
+        }
+    }
+
+    /**
+    * Obtener un registro o documento de la lista
+    * @param {*} req 
+    * @param {*} res 
+    */
+    const getItem = async (req, res) => {
+        try {
+            const { id } = matchedData(req)
+            const data = await storageModel.findById(id)
+            res.send({ data })
+        } catch (e) {
+            handleHttpError(res, 'ERROR_GET_ITEM')
+        }
+    }
+
+    /**
+    * Insertar un registro o documento a la lista
+    * @param {*} req 
+    * @param {*} res 
+    */
+    const createItem = async (req, res) => {
+        try {
+            const { file } = req
+            const fileData = {
+                filename: file.filename,
+                url: `${PUBLIC_URL}/${file.filename}`
+            }
+            const data = await storageModel.create(fileData)
+            res.send({data})
+        } catch (e) {
+            handleHttpError(res, 'ERROR_CREATE_ITEM')
+        }
+    }
+
+    /**
+    * Actualizar un registro o documento de la lista
+    * @param {*} req 
+    * @param {*} res 
+    */
+    const updateItem = async (req, res) => {
+        try {
+        } catch (e) {
+            handleHttpError(res, 'ERROR_UPDATE_ITEM')
+        }
+    }
+
+    /**
+    * Eliminar un registro o documento de la lista
+    * @param {*} req 
+    * @param {*} res 
+    */
+    const deleteItem = async (req, res) => {
+        try {
+            const { id } = matchedData(req)
+            const dataFile = await storageModel.findById(id)
+            await storageModel.delete({_id: id})
+            const { filename } = dataFile
+            const filePath = `${MEDIA_PATH}/${filename}`
+            //fs.unlinkSync(filePath)
+            const data = {
+                filePath,
+                delete: 1
+            }
+            res.send({ data })
+        } catch (e) {
+            handleHttpError(res, 'ERROR_DELETE_ITEM')
+        }
+    }
+
+    module.exports = { getItems, getItem, createItem, updateItem, deleteItem }
+    ```
+2. Modificar archivo de rutas **node\routes\storage.js**:
+    ```js
+    const express = require('express')
+    const router = express.Router()
+    const uploadMiddleware = require('../utils/handleStorage')
+    const { validatorGetItem } = require('../validators/storage')
+    const { getItems, getItem, createItem, updateItem, deleteItem } = require('../controllers/storage')
+
+    router.get('/', getItems)
+    router.get('/:id', validatorGetItem, getItem)
+    router.post('/', uploadMiddleware.single('myfile'), createItem)
+    router.put('/:id', validatorGetItem, updateItem)
+    router.delete('/:id', validatorGetItem, deleteItem)
+
+    module.exports = router
+    ```
+3. Crear validator **node\validators\storage.js**:
+    ```js
+    const { check } = require("express-validator")
+    const validateResults = require("../utils/handleValidator")
+
+    const validatorGetItem = [
+        check("id")
+            .exists()
+            .notEmpty(),
+        (req, res, next) => {
+            return validateResults(req, res, next)
+        }
+    ]
+
+    module.exports = { validatorGetItem };
+    ```
+
+## Sección 4: Sesion / Login / JWT
+### 18. Creando controlador de Registro
+27 min
 
 
 
@@ -706,17 +1087,7 @@
 
 
 
-### 15. CRUD
-13 min
-### 16. Soft Delete (Eliminado Lógico)
-11 min
-### 17. Controlador de Archivos
-16 min
 
-
-## Sección 4: Sesion / Login / JWT
-### 18. Creando controlador de Registro
-27 min
 ### 19. Registro / Generar JWT (Json Web Token)
 12 min
 ### 20. Login JWT (Json Web Token)
@@ -727,6 +1098,9 @@
 13 min
 ### 23. Enviar errores a Slack
 20 min
+
+
+## Sección 5: Motor de Base de datos MySQL / MongoDB
 ### 24. Implementando MySQL
 13 min
 ### 25. Modelos MySQL
