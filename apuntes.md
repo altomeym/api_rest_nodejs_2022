@@ -7,6 +7,7 @@
 + [Git](https://git-scm.com/downloads)
 + [Atlas MongoDB](https://www.mongodb.com/atlas/database)
 + [Express.js](https://expressjs.com)
++ [Slack](https://slack.com/intl/es-ve)
 
 
 ## Antes de iniciar:
@@ -152,7 +153,7 @@
                 type: String,
                 unique: true
             },
-            passwor: {
+            password: {
                 type: String,
             },
             role: {
@@ -1073,9 +1074,492 @@
 
 ## Sección 4: Sesion / Login / JWT
 ### 18. Creando controlador de Registro
-27 min
++ https://www.npmjs.com/package/jsonwebtoken
+1. Instalar JWT y bcryptjs:
+    + $ npm i jsonwebtoken -S
+    + $ npm i bcryptjs -S
+2. Crear archivo de rutas **node\routes\auth.js**:
+    ```js
+    const { matchedData } = require('express-validator')
+    const { encrypt, compare } = require('../utils/handlePassword')
+    const { usersModel } = require('../models')
+    const express = require("express")
+    const router = express.Router()
+    const { validatorRegister, validatorLogin } = require("../validators/auth")
+ 
+    router.post("/register", validatorRegister, async (req, res) => {
+        req = matchedData(req)
+        const password = await encrypt(req.password)
+        const body = {...req, password }    // Reemplazar o agrega la propieda password en req y se la signa a body
+        const data = await usersModel.create(body)
+        data.set('password', undefined, {strict: false})
+        res.send({data})
+    })
+
+    module.exports = router
+    ```
+3. Crear validator **node\validators\auth.js**:
+    ```js
+    const { check } = require("express-validator")
+    const validateResults = require("../utils/handleValidator")
+
+    const validatorRegister = [
+        check("name")
+            .exists()
+            .notEmpty()
+            .isLength({min:3, max:99}),
+        check("age")
+            .exists()
+            .notEmpty()
+            .isNumeric(),
+        check("password")
+            .exists()
+            .notEmpty()
+            .isLength({min:3, max:15}),
+        check("email")
+            .exists()
+            .notEmpty()
+            .isEmail(),
+        (req, res, next) => {
+            return validateResults(req, res, next)
+        }
+    ]
+
+    const validatorLogin = [
+        check("password")
+            .exists()
+            .notEmpty()
+            .isLength({min:3, max:15}),
+        check("email")
+            .exists()
+            .notEmpty()
+            .isEmail(),
+        (req, res, next) => {
+            return validateResults(req, res, next)
+        }
+    ]
+
+    module.exports = { validatorRegister, validatorLogin }
+    ```
+4. Crear handle **node\utils\handlePassword.js**:
+    ```js
+    const bcryptjs = require("bcryptjs")
+
+    /**
+    * Contraseña sin encriptar: hola.01
+    * @param {*} passwordPlain 
+    */
+    const encrypt = async (passwordPlain) => {
+        const hash = await bcryptjs.hash(passwordPlain, 10)
+        return hash
+    };
+
+    /**
+    * Pasar contraseña sin encriptar y pasar contraseña encriptada
+    * @param {*} passwordPlain 
+    * @param {*} hashPassword 
+    */
+    const compare = async (passwordPlain, hashPassword) => {
+        return await bcryptjs.compare(passwordPlain, hashPassword)
+    };
+
+    module.exports = { encrypt, compare }
+    ```
+5. Modificar modelo **node\models\nosql\users.js**:
+    ```js
+    ≡
+    password: {
+        type: String,
+        select: false
+    },
+    ≡
+    ```
+6. Realizar petición http:
+    + URL: http://localhost:3001/api/auth/register
+    + Método: POST
+    + Body:
+        ```json
+        {
+            "name": "Prueba 5",
+            "age": 45,
+            "email": "prueba5@gmail.com",
+            "password": "12345678"
+        }
+        ```
+
+### 19. Registro / Generar JWT (Json Web Token)
+1. Modificar **node\\.env**:
+    ```env
+    ≡
+    JWT_SECRET=LlaveMaestra
+    ```
+2. Crear handle **node\utils\handleJwt.js**:
+    ```js
+    const jwt = require("jsonwebtoken")
+    const JWT_SECRET = process.env.JWT_SECRET
+    //const getProperties = require("../utils/handlePropertiesEngine")
+    //const propertiesKey = getProperties()
+
+    /**
+    * Debes de pasar el objecto del usario
+    * @param {*} user
+    */
+    const tokenSign = async (user) => {
+        const sign = jwt.sign(
+            {
+                //[propertiesKey.id]: user[propertiesKey.id],
+                _id: user._id,
+                role: user.role,
+            },
+            JWT_SECRET,
+            {
+                expiresIn: "2h",
+            }
+        );
+
+        return sign
+    }
+
+    /**
+    * Debes de pasar el token de session el JWT
+    * @param {*} tokenJwt 
+    * @returns 
+    */
+    const verifyToken = async (tokenJwt) => {
+        try{
+            return jwt.verify(tokenJwt, JWT_SECRET)
+        }catch(e){
+            return null
+        }
+    }
+
+    module.exports = { tokenSign, verifyToken }
+    ```
+3. Modificar archivo de ruta **node\routes\auth.js**:
+    ```js
+    const express = require("express")
+    const { registerCtrl } = require("../controllers/auth")
+    const router = express.Router()
+    const { validatorRegister, validatorLogin } = require("../validators/auth")
+
+    router.post("/register", validatorRegister, registerCtrl )
+
+    module.exports = router
+    ```
+4. Crear controlador **node\controllers\auth.js**:
+    ```js
+    const { matchedData } = require('express-validator')
+    const { encrypt, compare } = require('../utils/handlePassword')
+    const { tokenSign } = require('../utils/handleJwt')
+    const { usersModel } = require('../models')
+
+    const registerCtrl = async (req, res) => {
+        req = matchedData(req)
+        const password = await encrypt(req.password)
+        const body = {...req, password }    // Reemplazar o agrega la propieda password en req y se la signa a body
+        const dataUser = await usersModel.create(body)
+        dataUser.set('password', undefined, {strict: false})
+
+        const data = {
+            token: await tokenSign(dataUser),
+            user: dataUser
+        }
+
+        res.send({data})
+    }
+
+    module.exports = { registerCtrl }
+    ```
+5. Realizar petición http:
+    + URL: http://localhost:3001/api/auth/register
+    + Método: POST
+    + Body:
+        ```json
+        {
+            "name": "Prueba 7",
+            "age": 45,
+            "email": "prueba7@gmail.com",
+            "password": "12345678"
+        }
+        ```
+
+### 20. Login JWT (Json Web Token)
+1. Modificar archivo de rutas **node\routes\auth.js**:
+    ```js
+    const express = require("express")
+    const { registerCtrl, loginCtrl } = require("../controllers/auth")
+    const router = express.Router()
+    const { validatorRegister, validatorLogin } = require("../validators/auth")
+
+    router.post("/register", validatorRegister, registerCtrl)
+    router.post("/login", validatorLogin, loginCtrl)
+
+    module.exports = router
+    ```
+2. Modificar controlador **node\controllers\auth.js**:
+    ```js
+    const { matchedData } = require('express-validator')
+    const { encrypt, compare } = require('../utils/handlePassword')
+    const { tokenSign } = require('../utils/handleJwt')
+    const { handleHttpError } = require('../utils/handleError')
+    const { usersModel } = require('../models')
+
+    /**
+    * 
+    * @param {*} req 
+    * @param {*} res 
+    */
+    const registerCtrl = async (req, res) => {
+        try {
+            req = matchedData(req)
+            const password = await encrypt(req.password)
+            const body = {...req, password }    // Reemplazar o agrega la propieda password en req y se la signa a body
+            const dataUser = await usersModel.create(body)
+            dataUser.set('password', undefined, {strict: false})
+        
+            const data = {
+                token: await tokenSign(dataUser),
+                user: dataUser
+            }
+            res.send({data})    
+        } catch (e) {
+            console.log('ERROR REGISTER: ', e)
+            handleHttpError(res, 'ERROR_REGISTER_USER')
+        }
+    }
+
+    /**
+    * 
+    * @param {*} req 
+    * @param {*} res 
+    */
+    const loginCtrl = async (req, res) => {
+        try {
+            req = matchedData(req)
+            const user = await usersModel.findOne({ email: req.email })
+                .select('password name role email')
+            if(!user) {
+                handleHttpError(res, 'ERROR_USER_NOT_EXISTS', 404)
+                return
+            }
+            const hashPassword = user.get('password')
+            const check = await compare(req.password, hashPassword)
+
+            if(!check) {
+                handleHttpError(res, 'ERROR_PASSWORD_INVALID', 401)
+                return
+            }
+
+            user.set('password', undefined, { strict: false })
+        
+            const data = {
+                token: await tokenSign(user),
+                user
+            }
+        
+            res.send({data})    
+        } catch (e) {
+            console.log('ERROR LOGIN: ', e)
+            handleHttpError(res, 'ERROR_LOGIN_USER')
+        }
+    }
+
+    module.exports = { registerCtrl, loginCtrl }
+    ```
+3. Realizar petición http:
+    + URL: http://localhost:3001/api/auth/login
+    + Método: POST
+    + Body:
+        ```json
+        {
+            "email": "prueba5@gmail.com",
+            "password": "12345678"
+        }
+        ```
+
+### 21. Proteger rutas (solo con sesión de usuario)
+1. Crear middleware **node\middleware\sesion.js**:
+    ```js
+    const { handleHttpError } = require("../utils/handleError")
+    const { verifyToken } = require("../utils/handleJwt")
+    const { usersModel } = require("../models")
+
+    const authMiddleware = async (req, res, next) => {
+        try {
+            if(!req.headers.authorization){
+                handleHttpError(res, "ERROR_NEED_SESSION", 401)
+                return
+            }
+
+            const token = req.headers.authorization.split(' ').pop()
+            const dataToken = await verifyToken(token)
+
+            if(!dataToken){
+                handleHttpError(res, "ERROR_NOT_PAYLOAD_DATA", 401)
+                return
+            }
+
+            const user = await usersModel.findById(dataToken._id)
+            req.user = user
+
+            next()
+        } catch (e) {
+            handleHttpError(res, "ERROR_NOT_SESSION", 401)
+        }
+    }
+
+    module.exports = authMiddleware
+    ```
+2. Modificar archivo de rutas **node\routes\tracks.js**:
+    ```js
+    ≡
+    const authMiddleware = require('../middleware/sesion')
+    const { validatorCreateItem, validatorGetItem } = require('../validators/tracks')
+    const { getItems, getItem, createItem, updateItem, deleteItem } = require('../controllers/tracks')
+
+    router.get('/', authMiddleware, getItems)
+    ≡
+    ```
+3. Modificar controlador **node\controllers\tracks.js**:
+    ```js
+    ≡
+    const getItems = async (req, res) => {
+        try {
+            const user = req.user
+            const data = await tracksModel.find({})
+            res.send({data, user})
+        } catch(e) {
+            handleHttpError(res, 'ERROR_GET_ITEMS')
+        }
+    }
+    ≡
+    ```
+4. Realizar petición http:
+    + URL: http://localhost:3001/api/tracks
+    + Método: GET
+    + Headers:
+        + Bearer Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2MjU5ZGQzY2NjNGEyMjJhMzQ4NWNiMmMiLCJyb2xlIjpbInVzZXIiXSwiaWF0IjoxNjUwMTQwOTY0LCJleHAiOjE2NTAxNDgxNjR9.Qoe6hplxLYVXi7csPPACFZwp0y1qD6iggrBnMWXLTqM
+
+### 22. Proteger rutas (Permisos)
+1. Modificar archivo de rutas **node\routes\tracks.js**:
+    ```js
+    const express = require('express')
+    const router = express.Router()
+    const authMiddleware = require('../middleware/sesion')
+    const checkRol = require('../middleware/rol')
+    const { validatorCreateItem, validatorGetItem } = require('../validators/tracks')
+    const { getItems, getItem, createItem, updateItem, deleteItem } = require('../controllers/tracks')
+
+    router.get('/', authMiddleware, getItems)
+    router.get('/:id', authMiddleware, validatorGetItem, getItem)
+    router.post('/', authMiddleware, checkRol(['admin']), validatorCreateItem, createItem)
+    router.put('/:id', authMiddleware, validatorGetItem, validatorCreateItem, updateItem)
+    router.delete('/:id', authMiddleware, validatorGetItem, deleteItem)
+
+    module.exports = router
+    ```
+2. Crear middleware **node\middleware\rol.js**:
+    ```js
+    const { handleHttpError } = require("../utils/handleError")
+    /**
+    * Array con los roles permitidos
+    * @param {*} rol
+    * @returns
+    */
+    const checkRol = (roles) => (req, res, next) => {
+        try {
+            const { user } = req
+            const rolesByUser = user.role   //TODO ["user"]
+            //TODO: ["admin","manager"]
+            const checkValueRol = roles.some((rolSingle) => rolesByUser.includes(rolSingle))   //TODO: true, false
+            if (!checkValueRol) {
+                handleHttpError(res, "ERROR_USER_NOT_PERMISSIONS", 403)
+                return
+            }
+            next()
+        } catch (e) {
+            handleHttpError(res, "ERROR_PERMISSIONS", 403)
+        }
+    }
+
+    module.exports = checkRol
+    ```
+
+### 23. Enviar errores a Slack
++ https://www.npmjs.com/package/morgan-body
+1. Crear cuenta en [Slack](https://slack.com/intl/es-ve)
+2. Ir a la aplicación de Slack al workspace [Soluciones++](https://app.slack.com/client/T03BBFZCM5M/C03C4NH6Y01)
+    + Crear un canal.
+        + Nombre: erroresbackend
+        + Descripción: Canal de prueba
+        + Establecer como canal cerrado
+3. Ir a https://api.slack.com/messaging/webhooks
+    + Click en **Create your Slack app**.
+    + Click en **From scratch**.
+        + App Name: [BOT] Monitorear errores de mi API
+        + Pick a workspace to develop your app in: Soluciones++
+    + Click en **Create App**.
+    + Click en **Incoming Webhooks**.
+        + Activate Incoming Webhooks: Activar.
+    + Click en **Add New Webhook to Workspace**.
+        + Seleccionar canal: erroresbackend
+        + Click en **Permitir**.
+    + Obtener **Webhook URL**:
+    ```
+    https://hooks.slack.com/services/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
+    ```
+3. Modificar **node\\.env**:
+    ```env
+    ≡
+    SLACK_WEBHOOK=https://hooks.slack.com/services/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
+    ```
+4. Instalar Morgan Body en el proyecto **node**:
+    + $ npm i morgan-body -S
+5. Modificar **node\app.js**:
+    ```js
+    ≡
+    const cors = require('cors')
+    const morganBody = require('morgan-body')
+    const loggerStream = require('./utils/handleLogger')
+    const dbConnect = require('./config/mongo')
+    const app = express()
+    ≡
+    app.use(express.static('storage'))
+
+    morganBody(app, {
+        noColors: true,
+        stream: loggerStream,
+        skip: function(req, res) {
+            return res.statusCode < 400
+        }
+    })
+
+    const port = process.env.PORT || 3000
+    ≡
+    ```
+6. Instalar dependencia para conectar con el Webhook de Slack:
+    + $ npm i @slack/webhook -S
+7. Crear handle **node\utils\handleLogger.js**:
+    ```js
+    const { IncomingWebhook } = require('@slack/webhook')
+
+    const webHook = new IncomingWebhook(process.env.SLACK_WEBHOOK)
+
+    const loggerStream = {
+        write: message => {
+            webHook.send({
+                text: message
+            })
+        },
+    }
+
+    module.exports = loggerStream
+    ```
 
 
+## Sección 5: Motor de Base de datos MySQL / MongoDB
+### 24. Implementando MySQL
+13 min
 
 
 
@@ -1088,21 +1572,7 @@
 
 
 
-### 19. Registro / Generar JWT (Json Web Token)
-12 min
-### 20. Login JWT (Json Web Token)
-12 min
-### 21. Proteger rutas (solo con sesión de usuario)
-13 min
-### 22. Proteger rutas (Permisos)
-13 min
-### 23. Enviar errores a Slack
-20 min
 
-
-## Sección 5: Motor de Base de datos MySQL / MongoDB
-### 24. Implementando MySQL
-13 min
 ### 25. Modelos MySQL
 23 min
 ### 26. Login con MySQL
@@ -1111,6 +1581,9 @@
 10 min
 ### 28. (MySQL) Métodos Personalizados Relación
 10 min
+
+
+## Sección 6: Documentación API OpenAPI / Swagger
 ### 29. Instalación de Swagger / OpenAPI
 12 min
 ### 30. Swagger Schemas
